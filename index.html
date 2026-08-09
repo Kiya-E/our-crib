@@ -73,6 +73,11 @@
     .overview-card h3 { font-size: 1rem; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
     .chart-box { position: relative; height: 240px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
 
+    .upcoming-list { display: flex; flex-direction: column; gap: 10px; max-height: 240px; overflow-y: auto; padding-right: 5px; }
+    .upcoming-item { background: var(--card-bg); border: 1px solid var(--border); padding: 10px 14px; border-radius: 10px; display: flex; justify-content: space-between; align-items: center; font-size: 0.9rem; }
+    .upcoming-title { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 8px; }
+    .upcoming-date { color: var(--accent-yellow); font-size: 0.8rem; font-weight: 600; }
+
     .card-drilldown { margin-top: 15px; padding-top: 12px; border-top: 1px dashed var(--border); display: none; }
     .card-drilldown h4 { color: var(--accent-yellow); margin-bottom: 8px; font-size: 0.9rem; }
     .drilldown-tags { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -194,12 +199,17 @@
     <button class="nav-tab-btn" id="tab-Radar" onclick="switchTab('Radar')">👀 Watching & Pending</button>
     <button class="nav-tab-btn" id="tab-Show" onclick="switchTab('Show')">📺 Shows</button>
     <button class="nav-tab-btn" id="tab-Movie" onclick="switchTab('Movie')">🎬 Movies</button>
-    <button class="nav-tab-btn" id="tab-Book" onclick="switchTab('Book')">📚 Books</button>
-    <button class="nav-tab-btn" id="tab-Album" onclick="switchTab('Album')">🎵 Albums</button>
   </div>
 
   <!-- OVERVIEW COVER SHEET DASHBOARD -->
   <div class="overview-container" id="overviewDashboard">
+    <div class="overview-card">
+      <div>
+        <h3>📅 Upcoming New Episodes</h3>
+        <div class="upcoming-list" id="upcomingEpisodesList"></div>
+      </div>
+    </div>
+
     <div class="overview-card">
       <div>
         <h3>🎨 Genre Breakdown</h3>
@@ -263,15 +273,15 @@
       <table>
         <thead>
           <tr>
-            <th>Rating & Vibe</th>
             <th>Cover & Title</th>
             <th>Genre</th>
             <th style="text-align: center;" id="col-seasons">Seasons</th>
             <th>Status</th>
             <th style="text-align: center;" id="col-total">Total Ep</th>
             <th style="text-align: center;" id="col-progress">Watched</th>
-            <th>Completion</th>
             <th style="text-align: center;">Left</th>
+            <th>Completion</th>
+            <th>Rating & Vibe</th>
             <th>Notes</th>
             <th style="text-align: center;">Action</th>
           </tr>
@@ -298,8 +308,6 @@
       <select id="modalTypeInput">
         <option value="Show">Show</option>
         <option value="Movie">Movie</option>
-        <option value="Book">Book</option>
-        <option value="Album">Album</option>
       </select>
     </div>
     <div class="form-group">
@@ -401,12 +409,12 @@
     
     try {
       firebase.initializeApp({ databaseURL: databaseURL });
-      dbRef = firebase.database().ref('media_library_v22');
+      dbRef = firebase.database().ref('media_library_v23');
       listenToFirebase();
       return;
     } catch(e) { console.log("Firebase init error", e); }
     
-    mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v22')) || initialData;
+    mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v23')) || initialData;
     checkAutoAirUpdates();
     populateGenres();
     renderApp();
@@ -454,7 +462,7 @@
       mediaList.forEach(m => objData[m.id] = m);
       dbRef.set(objData);
     } else {
-      localStorage.setItem('local_media_tracker_v22', JSON.stringify(mediaList));
+      localStorage.setItem('local_media_tracker_v23', JSON.stringify(mediaList));
       renderApp();
     }
   }
@@ -474,6 +482,7 @@
 
     if (type === 'Overview') {
       overviewEl.style.display = 'grid';
+      renderOverviewNewEpisodes();
       renderCharts();
     } else if (type === 'Radar') {
       radarEl.style.display = 'grid';
@@ -495,18 +504,6 @@
         document.getElementById('lbl-total-items').innerText = 'Total Movies';
         document.getElementById('lbl-active-items').innerText = 'To Watch';
         document.getElementById('lbl-progress-items').innerText = 'Movies Watched';
-      } else if (type === 'Book') {
-        document.getElementById('col-total').innerText = 'Pages';
-        document.getElementById('col-progress').innerText = 'Read';
-        document.getElementById('lbl-total-items').innerText = 'Total Books';
-        document.getElementById('lbl-active-items').innerText = 'Currently Reading';
-        document.getElementById('lbl-progress-items').innerText = 'Pages Read';
-      } else if (type === 'Album') {
-        document.getElementById('col-total').innerText = 'Tracks';
-        document.getElementById('col-progress').innerText = 'Listened';
-        document.getElementById('lbl-total-items').innerText = 'Total Albums';
-        document.getElementById('lbl-active-items').innerText = 'Listening To';
-        document.getElementById('lbl-progress-items').innerText = 'Tracks Played';
       }
 
       populateGenres();
@@ -517,6 +514,7 @@
   function renderApp() {
     updateTopStats();
     if (activeTabType === 'Overview') {
+      renderOverviewNewEpisodes();
       renderCharts();
     } else if (activeTabType === 'Radar') {
       renderRadar();
@@ -527,7 +525,7 @@
 
   function updateTopStats() {
     let totalItems = mediaList.length;
-    let totalActive = mediaList.filter(m => m.status === 'Watching' || m.status === 'Reading' || m.status === 'Up to Date').length;
+    let totalActive = mediaList.filter(m => m.status === 'Watching' || m.status === 'Up to Date').length;
     let totalProgress = mediaList.reduce((acc, m) => acc + Number(m.progress || 0), 0);
     let totalMax = mediaList.reduce((acc, m) => acc + Number(m.total || 0), 0);
 
@@ -536,6 +534,26 @@
     document.getElementById('stat-episodes').innerText = totalProgress;
     const overallPct = totalMax > 0 ? Math.round((totalProgress / totalMax) * 100) : 0;
     document.getElementById('stat-completion').innerText = `${overallPct}%`;
+  }
+
+  function renderOverviewNewEpisodes() {
+    const listEl = document.getElementById('upcomingEpisodesList');
+    listEl.innerHTML = '';
+    const itemsWithDates = mediaList.filter(m => m.airDate && m.airDate.trim() !== '').sort((a, b) => new Date(a.airDate) - new Date(b.airDate));
+
+    if (itemsWithDates.length === 0) {
+      listEl.innerHTML = '<span style="color:var(--text-muted); font-size:0.85rem;">No upcoming air dates scheduled.</span>';
+      return;
+    }
+
+    itemsWithDates.forEach(item => {
+      listEl.innerHTML += `
+        <div class="upcoming-item">
+          <div class="upcoming-title">${item.icon || '📺'} ${item.title}</div>
+          <div class="upcoming-date">📅 ${item.airDate}</div>
+        </div>
+      `;
+    });
   }
 
   function populateGenres() {
@@ -609,8 +627,7 @@
       // Conditional Button: Appears ONLY when progress < total
       let actionBtnHtml = '';
       if (progress < total) {
-        const label = activeTabType === 'Book' ? '+1 Pg' : activeTabType === 'Album' ? '+1 Trk' : '✨ New Episode Watched';
-        actionBtnHtml = `<button class="btn-inc" onclick="incrementProgress('${item.id}')">${label}</button>`;
+        actionBtnHtml = `<button class="btn-inc" onclick="incrementProgress('${item.id}')">✨ New Episode Watched</button>`;
       }
 
       let starsHtml = '';
@@ -643,12 +660,6 @@
       tbody.innerHTML += `
         <tr>
           <td>
-            <div class="ratings-box">
-              <div class="stars-row">${starsHtml}</div>
-              <select class="vibe-select" onchange="setVibe('${item.id}', this.value)">${vibeOptions}</select>
-            </div>
-          </td>
-          <td>
             <div class="title-cell">
               <img src="${item.imageUrl}" alt="Poster" class="poster-img" referrerpolicy="no-referrer" onerror="this.src=getPlaceholderImage('${item.title}')">
               <div class="title-text">
@@ -662,6 +673,7 @@
           <td><span class="tag-status ${statusClass}">${item.status}</span></td>
           <td style="text-align: center;">${item.total}</td>
           <td style="text-align: center; font-weight: bold; color: #fff;">${item.progress}</td>
+          <td style="text-align: center; color: ${left > 0 ? '#f97316' : 'var(--text-muted)'};">${left}</td>
           <td>
             <div class="completion-shape-box">
               <svg width="26" height="26" viewBox="0 0 24 24">
@@ -676,7 +688,12 @@
               <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">${pct}%</span>
             </div>
           </td>
-          <td style="text-align: center; color: ${left > 0 ? '#f97316' : 'var(--text-muted)'};">${left}</td>
+          <td>
+            <div class="ratings-box">
+              <div class="stars-row">${starsHtml}</div>
+              <select class="vibe-select" onchange="setVibe('${item.id}', this.value)">${vibeOptions}</select>
+            </div>
+          </td>
           <td style="font-size: 0.85rem; color: var(--text-muted); max-width: 150px; word-break: break-word;">${item.notes || '-'}</td>
           <td style="text-align: center; white-space: nowrap;">
             ${actionBtnHtml}
@@ -890,8 +907,7 @@
     if (item && item.progress < item.total) {
       item.progress = Number(item.progress) + 1;
       if (item.progress === item.total) {
-        if (item.type === 'Book') item.status = 'Read';
-        else if (item.type === 'Show' || item.type === 'Movie') item.status = 'Completed';
+        item.status = 'Completed';
       }
       syncToCloud();
     }
@@ -979,7 +995,7 @@
         id: Date.now().toString(),
         type: type,
         imageUrl: imgUrl,
-        icon: type === 'Show' ? '📺' : type === 'Movie' ? '🎬' : type === 'Book' ? '📚' : '🎵',
+        icon: type === 'Show' ? '📺' : '🎬',
         title: title,
         rating: 0,
         vibe: "",
@@ -1009,7 +1025,7 @@
   // --- ROULETTE LOGIC ---
   function spinRoulette() {
     const targetType = (activeTabType === 'Overview' || activeTabType === 'Radar') ? 'Show' : activeTabType;
-    const eligibleItems = mediaList.filter(m => m.type === targetType && m.status !== 'Completed' && m.status !== 'Read');
+    const eligibleItems = mediaList.filter(m => m.type === targetType && m.status !== 'Completed');
     
     if (eligibleItems.length === 0) {
       alert("No active items found in this category to spin for! Add some or change their status.");
