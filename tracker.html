@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>fav hoe's crib</title>
+  
+  <!-- Firebase App & Database SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+  <!-- Chart.js for Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    :root {
+      --bg: #121026;
+      --card-bg: #1f1a3a;
+      --panel-bg: #17132e;
+      --border: #382f66;
+      --text: #f3f4f6;
+      --text-muted: #a5b4fc;
+      --accent-blue: #3b82f6;
+      --accent-purple: #8b5cf6;
+      --accent-yellow: #facc15;
+
+      --st-uptodate: #10b981;
+      --st-watching: #3b82f6;
+      --st-paused: #ef4444;
+      --st-completed: #8b5cf6;
+      --st-pending: #b45309;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 25px; }
+    .container { max-width: 1500px; margin: 0 auto; }
+
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; }
+    .title-area h1 { 
+      font-size: 1.9rem; 
+      font-weight: 800; 
+      background: linear-gradient(135deg, #3b82f6, #a855f7, #facc15);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+    }
+    .sync-badge { font-size: 0.85rem; padding: 6px 14px; border-radius: 20px; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); font-weight: 700; display: flex; align-items: center; gap: 6px; box-shadow: 0 0 10px rgba(59, 130, 246, 0.2); }
+    .sync-dot { width: 9px; height: 9px; border-radius: 50%; background: #60a5fa; animation: pulse 2s infinite; }
+
+    @keyframes pulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0.7); }
+      70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(96, 165, 250, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
+    }
+
+    .setup-banner { background: #1e1b4b; border: 2px dashed #6d28d9; color: #ede9fe; padding: 14px 18px; border-radius: 12px; margin-bottom: 25px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+
+    /* Summary Bar */
+    .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+    .sum-card { background: var(--card-bg); border: 2px solid var(--border); padding: 18px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s; }
+    .sum-card:hover { transform: translateY(-3px); border-color: var(--accent-blue); }
+    .sum-card .label { font-size: 0.75rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+    .sum-card .val { font-size: 1.6rem; font-weight: 800; margin-top: 6px; color: var(--accent-yellow); }
+
+    /* Navigation Tabs */
+    .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+    .nav-tab-btn { background: var(--card-bg); border: 2px solid var(--border); color: var(--text-muted); padding: 12px 24px; border-radius: 12px; cursor: pointer; font-weight: 700; font-size: 1rem; transition: all 0.2s; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .nav-tab-btn:hover { color: #fff; border-color: var(--accent-blue); transform: translateY(-2px); }
+    .nav-tab-btn.active { background: linear-gradient(135deg, #3b82f6, #7c3aed); color: white; border-color: #3b82f6; box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+
+    /* Overview Dashboard Container */
+    .overview-container { display: none; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .overview-card { background: var(--panel-bg); border: 2px solid var(--border); padding: 25px; border-radius: 16px; box-shadow: 0 8px 25px rgba(0,0,0,0.3); display: flex; flex-direction: column; justify-content: space-between; }
+    .overview-card h3 { font-size: 1rem; color: var(--accent-yellow); margin-bottom: 15px; display: flex; align-items: center; gap: 8px; }
+    .chart-box { position: relative; height: 240px; display: flex; justify-content: center; align-items: center; cursor: pointer; }
+
+    .card-drilldown { margin-top: 15px; padding-top: 12px; border-top: 1px dashed var(--border); display: none; }
+    .card-drilldown h4 { color: var(--accent-yellow); margin-bottom: 8px; font-size: 0.9rem; }
+    .drilldown-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+    .drilldown-tag { background: var(--card-bg); border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; color: #fff; font-size: 0.8rem; font-weight: 600; }
+
+    /* Radar Tab View */
+    .radar-container { display: none; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; margin-bottom: 25px; }
+    .radar-card { background: var(--panel-bg); border: 2px solid var(--border); border-radius: 14px; padding: 20px; display: flex; gap: 15px; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .radar-poster { width: 60px; height: 85px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+    .radar-info { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .radar-title { font-weight: 700; font-size: 1rem; color: #fff; }
+    .radar-date { font-size: 0.8rem; color: var(--accent-yellow); font-weight: 600; }
+
+    /* Controls Bar */
+    .controls-bar { background: var(--panel-bg); border: 2px solid var(--border); padding: 15px; border-radius: 14px; margin-bottom: 25px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .controls-bar input, .controls-bar select { background: var(--card-bg); border: 2px solid var(--border); color: #fff; padding: 10px 14px; border-radius: 10px; font-size: 0.9rem; outline: none; transition: border-color 0.2s; }
+    .controls-bar input:focus, .controls-bar select:focus { border-color: var(--accent-blue); }
+    .controls-bar input[type="text"] { flex: 1; min-width: 200px; }
+    
+    .btn-roulette { 
+      background: linear-gradient(135deg, #3b82f6, #7c3aed); 
+      color: #fff; 
+      border: none; 
+      padding: 10px 22px; 
+      border-radius: 10px; 
+      font-weight: 800; 
+      font-size: 1rem; 
+      cursor: pointer; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+      transition: transform 0.2s, filter 0.2s; 
+      box-shadow: 0 4px 15px rgba(124, 58, 237, 0.4);
+    }
+    .btn-roulette:hover { filter: brightness(1.15); transform: scale(1.04); }
+    
+    .btn-add { background: var(--accent-yellow); color: #121026; border: none; padding: 10px 22px; border-radius: 10px; font-weight: 800; cursor: pointer; margin-left: auto; display: flex; align-items: center; gap: 6px; box-shadow: 0 4px 15px rgba(250, 204, 21, 0.3); transition: transform 0.2s; }
+    .btn-add:hover { background: #fde047; transform: scale(1.04); }
+
+    /* Main Table Section */
+    .tab-content-section { display: block; }
+    .table-wrapper { background: var(--panel-bg); border: 2px solid var(--border); border-radius: 14px; overflow-x: auto; box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem; }
+    th { background: rgba(255,255,255,0.03); padding: 15px 16px; color: var(--text-muted); font-weight: 700; border-bottom: 2px solid var(--border); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.5px; }
+    td { padding: 14px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover { background: rgba(255,255,255,0.03); }
+
+    .title-cell { font-weight: 700; color: #fff; display: flex; align-items: center; gap: 14px; }
+    .poster-img { width: 50px; height: 72px; object-fit: cover; border-radius: 8px; background: var(--card-bg); border: 2px solid var(--border); box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+    .title-text { display: flex; flex-direction: column; gap: 4px; }
+    .icon-badge { font-size: 0.85rem; opacity: 0.9; }
+
+    .ratings-box { display: flex; flex-direction: column; gap: 6px; }
+    .stars-row { cursor: pointer; color: #4b5563; font-size: 1rem; letter-spacing: 2px; }
+    .stars-row .star.active { color: var(--accent-yellow); text-shadow: 0 0 8px rgba(250, 204, 21, 0.6); }
+    .vibe-select { background: #121026; border: 1px solid var(--border); color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; outline: none; width: fit-content; cursor: pointer; }
+
+    .tag-status { padding: 5px 12px; border-radius: 14px; font-size: 0.75rem; font-weight: 700; display: inline-block; color: white; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+    .status-uptodate { background: var(--st-uptodate); }
+    .status-watching { background: var(--st-watching); }
+    .status-paused { background: var(--st-paused); }
+    .status-completed { background: var(--st-completed); }
+    .status-pending { background: var(--st-pending); }
+
+    /* Filled Heart Completion Shape */
+    .completion-shape-box { display: flex; align-items: center; gap: 8px; }
+
+    .btn-inc { background: linear-gradient(135deg, #3b82f6, #7c3aed); color: #fff; border: none; padding: 7px 14px; border-radius: 8px; cursor: pointer; font-weight: 800; font-size: 0.8rem; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4); transition: transform 0.1s; }
+    .btn-inc:hover { transform: scale(1.03); filter: brightness(1.1); }
+    
+    .btn-edit { background: rgba(250, 204, 21, 0.15); border: 1px solid rgba(250, 204, 21, 0.4); color: var(--accent-yellow); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 0.8rem; transition: background 0.2s; }
+    .btn-edit:hover { background: var(--accent-yellow); color: #121026; }
+
+    .btn-delete { background: transparent; border: none; color: #f43f5e; cursor: pointer; font-size: 1.2rem; padding: 2px 8px; transition: transform 0.1s; }
+    .btn-delete:hover { transform: scale(1.2); }
+
+    /* Custom Edit/Add Modal with Dropdowns */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10, 8, 26, 0.85); display: none; justify-content: center; align-items: center; z-index: 1000; backdrop-filter: blur(5px); }
+    .modal-card { background: var(--panel-bg); border: 2px solid var(--accent-blue); padding: 30px; border-radius: 16px; max-width: 450px; width: 90%; box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3); max-height: 90vh; overflow-y: auto; }
+    .modal-card h2 { margin-bottom: 20px; color: var(--accent-yellow); font-size: 1.3rem; text-align: center; }
+    .form-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea { background: var(--card-bg); border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 8px; font-size: 0.9rem; outline: none; }
+    .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+    .btn-save { background: var(--accent-blue); color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+    .btn-cancel { background: var(--border); color: #fff; border: none; padding: 8px 18px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+    /* Roulette Modal */
+    .roulette-card { background: var(--panel-bg); border: 2px solid var(--accent-blue); padding: 35px; border-radius: 16px; text-align: center; max-width: 420px; width: 90%; box-shadow: 0 15px 35px rgba(59, 130, 246, 0.3); }
+    .roulette-card h2 { margin-bottom: 15px; color: var(--accent-yellow); font-size: 1.5rem; }
+    .roulette-display { font-size: 1.3rem; font-weight: 800; color: #fff; margin: 20px 0; min-height: 60px; display: flex; align-items: center; justify-content: center; background: var(--card-bg); border-radius: 10px; border: 2px solid var(--border); padding: 15px; box-shadow: inset 0 2px 5px rgba(0,0,0,0.5); }
+    .btn-close-modal { background: linear-gradient(135deg, #3b82f6, #7c3aed); color: white; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 800; cursor: pointer; margin-top: 15px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  
+  <header>
+    <div class="title-area">
+      <h1>💖 fav hoe's crib</h1>
+    </div>
+    <div class="sync-badge">
+      <div class="sync-dot"></div> Live Duo Sync
+    </div>
+  </header>
+
+  <div class="setup-banner" id="setupBanner">
+    <span>💡 <strong>Realtime Sharing Active:</strong> Open this link on both your devices to track together live!</span>
+    <button class="btn-inc" style="background:#3b82f6; color:#fff; border-color:#60a5fa; font-size: 0.85rem;" onclick="configureFirebase()">Configure Firebase Key</button>
+  </div>
+
+  <div class="summary-bar">
+    <div class="sum-card"><div class="label" id="lbl-total-items">Total Shows</div><div class="val" id="stat-total-shows">0</div></div>
+    <div class="sum-card"><div class="label" id="lbl-active-items">Currently Watching</div><div class="val" id="stat-watching">0</div></div>
+    <div class="sum-card"><div class="label" id="lbl-progress-items">Episodes Watched</div><div class="val" id="stat-episodes">0</div></div>
+    <div class="sum-card"><div class="label">Overall Completion</div><div class="val" id="stat-completion">0%</div></div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="nav-tabs">
+    <button class="nav-tab-btn active" id="tab-Overview" onclick="switchTab('Overview')">🏠 Overview</button>
+    <button class="nav-tab-btn" id="tab-Radar" onclick="switchTab('Radar')">👀 Watching & Pending</button>
+    <button class="nav-tab-btn" id="tab-Show" onclick="switchTab('Show')">📺 Shows</button>
+    <button class="nav-tab-btn" id="tab-Movie" onclick="switchTab('Movie')">🎬 Movies</button>
+    <button class="nav-tab-btn" id="tab-Book" onclick="switchTab('Book')">📚 Books</button>
+    <button class="nav-tab-btn" id="tab-Album" onclick="switchTab('Album')">🎵 Albums</button>
+  </div>
+
+  <!-- OVERVIEW COVER SHEET DASHBOARD -->
+  <div class="overview-container" id="overviewDashboard">
+    <div class="overview-card">
+      <div>
+        <h3>🎨 Genre Breakdown</h3>
+        <div class="chart-box"><canvas id="genreChart"></canvas></div>
+      </div>
+      <div class="card-drilldown" id="drilldown-genre"></div>
+    </div>
+
+    <div class="overview-card">
+      <div>
+        <h3>⭐ Ratings Breakdown</h3>
+        <div class="chart-box"><canvas id="ratingChart"></canvas></div>
+      </div>
+      <div class="card-drilldown" id="drilldown-rating"></div>
+    </div>
+
+    <div class="overview-card">
+      <div>
+        <h3>🎯 Status Breakdown</h3>
+        <div class="chart-box"><canvas id="statusChart"></canvas></div>
+      </div>
+      <div class="card-drilldown" id="drilldown-status"></div>
+    </div>
+
+    <div class="overview-card">
+      <div>
+        <h3>🎭 Vibe Breakdown</h3>
+        <div class="chart-box"><canvas id="vibeChart"></canvas></div>
+      </div>
+      <div class="card-drilldown" id="drilldown-vibe"></div>
+    </div>
+  </div>
+
+  <!-- WATCHING & PENDING RADAR TAB -->
+  <div class="radar-container" id="radarDashboard"></div>
+
+  <!-- MAIN TABLE SECTION -->
+  <div class="tab-content-section" id="tableSection" style="display: none;">
+    <div class="controls-bar">
+      <input type="text" id="searchInput" placeholder="🔍 Search title..." oninput="renderTable()">
+      
+      <select id="filterStatus" onchange="renderTable()">
+        <option value="ALL">All Statuses</option>
+        <option value="Up to Date">Up to Date</option>
+        <option value="Watching">Watching</option>
+        <option value="Paused">Paused</option>
+        <option value="Completed">Completed</option>
+        <option value="Pending Next Season">Pending Next Season</option>
+        <option value="Pending Movie">Pending Movie</option>
+      </select>
+
+      <select id="filterGenre" onchange="renderTable()">
+        <option value="ALL">All Genres</option>
+      </select>
+
+      <button class="btn-roulette" onclick="spinRoulette()">🎰 Decide For Us</button>
+      <button class="btn-add" onclick="openAddModal()">➕ Add New</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Rating & Vibe</th>
+            <th>Cover & Title</th>
+            <th>Genre</th>
+            <th style="text-align: center;" id="col-seasons">Seasons</th>
+            <th>Status</th>
+            <th style="text-align: center;" id="col-total">Total Ep</th>
+            <th style="text-align: center;" id="col-progress">Watched</th>
+            <th>Completion</th>
+            <th style="text-align: center;">Left</th>
+            <th>Notes</th>
+            <th style="text-align: center;">Action</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Interactive Edit / Add Modal Form with Dropdowns -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal-card">
+    <h2 id="modalTitle">Edit Item</h2>
+    <input type="hidden" id="editId">
+    
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="modalTitleInput" oninput="autoFillPlaceholderImage()">
+    </div>
+    <div class="form-group">
+      <label>Type</label>
+      <select id="modalTypeInput">
+        <option value="Show">Show</option>
+        <option value="Movie">Movie</option>
+        <option value="Book">Book</option>
+        <option value="Album">Album</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Genre</label>
+      <input type="text" id="modalGenreInput">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="modalStatusInput">
+        <option value="Up to Date">Up to Date</option>
+        <option value="Watching">Watching</option>
+        <option value="Paused">Paused</option>
+        <option value="Completed">Completed</option>
+        <option value="Pending Next Season">Pending Next Season</option>
+        <option value="Pending Movie">Pending Movie</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Seasons (Shows only)</label>
+      <input type="number" id="modalSeasonsInput">
+    </div>
+    <div class="form-group">
+      <label id="modalTotalLabel">Total Episodes</label>
+      <input type="number" id="modalTotalInput">
+    </div>
+    <div class="form-group">
+      <label id="modalProgressLabel">Watched Count</label>
+      <input type="number" id="modalProgressInput">
+    </div>
+    <div class="form-group">
+      <label>Latest Episode Air Date</label>
+      <input type="date" id="modalAirDateInput">
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="modalNotesInput" rows="2" placeholder="Add any notes here..."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Image URL (Never blank)</label>
+      <input type="text" id="modalImgInput" placeholder="Auto-generated if left blank...">
+    </div>
+
+    <div class="modal-buttons">
+      <button class="btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-save" onclick="saveModalData()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- Roulette Modal -->
+<div class="modal-overlay" id="rouletteModal">
+  <div class="roulette-card">
+    <h2>🎰 Roulette Spin!</h2>
+    <div class="roulette-display" id="rouletteDisplay">Spinning...</div>
+    <button class="btn-close-modal" onclick="closeRoulette()">Awesome, Let's Watch!</button>
+  </div>
+</div>
+
+<script>
+  let activeTabType = 'Overview';
+  let genreChartInstance = null;
+  let ratingChartInstance = null;
+  let statusChartInstance = null;
+  let vibeChartInstance = null;
+
+  function getPlaceholderImage(title) {
+    return `https://placehold.co/150x225/1f1a3a/a5b4fc?text=${encodeURIComponent(title || 'Poster')}`;
+  }
+
+  const initialData = [
+    { id: "1", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Dandadan", icon: "🌻", title: "Dandadan", rating: 4, vibe: "🔥 Absolute Fire", genre: "Unhinged", seasons: 2, status: "Up to Date", total: 22, progress: 22, airDate: "2026-08-20", notes: "" },
+    { id: "2", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Death+Note", icon: "📓", title: "Death Note", rating: 5, vibe: "🤯 Mind Blown", genre: "Supernatural Thriller", seasons: 1, status: "Completed", total: 37, progress: 37, airDate: "", notes: "" },
+    { id: "3", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Horimiya", icon: "🩹", title: "Horimiya", rating: 3, vibe: "✨ Cozy", genre: "Romance", seasons: 2, status: "Paused", total: 26, progress: 13, airDate: "", notes: "" },
+    { id: "4", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Sakamoto+Days", icon: "🩹", title: "Sakamoto Days", rating: 0, vibe: "🔥 Absolute Fire", genre: "Action Comedy", seasons: 1, status: "Watching", total: 20, progress: 11, airDate: "2026-08-14", notes: "" },
+    { id: "5", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Your+Lie+in+April", icon: "🎹", title: "Your Lie in April", rating: 5, vibe: "😭 Emotional Damage", genre: "Romance", seasons: 1, status: "Completed", total: 22, progress: 22, airDate: "", notes: "" },
+    { id: "6", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Attack+on+Titan", icon: "🌻", title: "Attack on Titan", rating: 5, vibe: "🤯 Mind Blown", genre: "Dark Fantasy", seasons: 4, status: "Completed", total: 94, progress: 94, airDate: "", notes: "" },
+    { id: "7", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Vinland+Saga", icon: "⚔️", title: "Vinland Saga", rating: 5, vibe: "🔥 Absolute Fire", genre: "Historical", seasons: 2, status: "Completed", total: 48, progress: 48, airDate: "", notes: "" },
+    { id: "8", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Windbreaker", icon: "🩹", title: "Windbreaker", rating: 0, vibe: "🔥 Absolute Fire", genre: "Action", seasons: 2, status: "Pending Next Season", total: 25, progress: 25, airDate: "2026-09-01", notes: "" },
+    { id: "9", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=One+Piece", icon: "🏴‍☠️", title: "One Piece", rating: 4, vibe: "🔥 Absolute Fire", genre: "Adventure", seasons: 21, status: "Paused", total: 1141, progress: 865, airDate: "2026-08-10", notes: "" },
+    { id: "10", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Assassination+Classroom", icon: "🌻", title: "Assassination Classroom", rating: 5, vibe: "✨ Cozy", genre: "Action Comedy", seasons: 2, status: "Completed", total: 47, progress: 47, airDate: "", notes: "" },
+    { id: "11", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Frieren", icon: "🌻", title: "Frieren", rating: 5, vibe: "✨ Cozy", genre: "Fantasy", seasons: 1, status: "Pending Next Season", total: 28, progress: 28, airDate: "2026-10-15", notes: "" },
+    { id: "12", type: "Movie", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=A+Silent+Voice", icon: "🩹", title: "A Silent Voice", rating: 5, vibe: "😭 Emotional Damage", genre: "Psychological", seasons: 0, status: "Completed", total: 1, progress: 1, airDate: "", notes: "" },
+    { id: "13", type: "Movie", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Grave+of+the+Fireflies", icon: "🩹", title: "Grave of the Fireflies", rating: 5, vibe: "😭 Emotional Damage", genre: "Historical", seasons: 0, status: "Completed", total: 1, progress: 1, airDate: "", notes: "" },
+    { id: "14", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Demon+Slayer", icon: "🌻", title: "Demon Slayer", rating: 4, vibe: "🔥 Absolute Fire", genre: "Dark Fantasy", seasons: 4, status: "Pending Movie", total: 63, progress: 63, airDate: "2026-12-01", notes: "" },
+    { id: "15", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Hikaru+Died", icon: "🌹", title: "The Summer Hikaru Died", rating: 0, vibe: "🤯 Mind Blown", genre: "Supernatural", seasons: 1, status: "Watching", total: 12, progress: 1, airDate: "2026-08-11", notes: "" },
+    { id: "16", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Takopi", icon: "🩹", title: "Takopi’s Original Sin", rating: 0, vibe: "😭 Emotional Damage", genre: "Psychological", seasons: 1, status: "Watching", total: 6, progress: 1, airDate: "2026-08-12", notes: "" },
+    { id: "17", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Castlevania", icon: "🩹", title: "Castlevania", rating: 0, vibe: "🔥 Absolute Fire", genre: "Supernatural", seasons: 4, status: "Watching", total: 32, progress: 3, airDate: "2026-08-15", notes: "" },
+    { id: "18", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Avatar+ATLA", icon: "🌻", title: "Avatar the Last Airbender", rating: 5, vibe: "✨ Cozy", genre: "Adventure", seasons: 3, status: "Watching", total: 61, progress: 21, airDate: "2026-08-13", notes: "" },
+    { id: "19", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Gachiakuta", icon: "🌻", title: "Gachiakuta", rating: 0, vibe: "🔥 Absolute Fire", genre: "Action", seasons: 1, status: "Watching", total: 20, progress: 18, airDate: "2026-08-16", notes: "" },
+    { id: "20", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Ghost+Stories", icon: "🌻", title: "Ghost Stories", rating: 0, vibe: "🤡 Pure Comedy", genre: "Satire", seasons: 1, status: "Watching", total: 20, progress: 0, airDate: "2026-08-18", notes: "" },
+    { id: "21", type: "Show", imageUrl: "https://placehold.co/150x225/1f1a3a/a5b4fc?text=Jujutsu+Kaisen", icon: "🌻", title: "Jujutsu Kaisen", rating: 4, vibe: "🔥 Absolute Fire", genre: "Paranormal", seasons: 2, status: "Watching", total: 47, progress: 31, airDate: "2026-08-19", notes: "" }
+  ];
+
+  let mediaList = [];
+  let dbRef = null;
+
+  function initApp() {
+    const savedConfig = localStorage.getItem('fb_tracker_config');
+    if (savedConfig) {
+      try {
+        firebase.initializeApp(JSON.parse(savedConfig));
+        dbRef = firebase.database().ref('media_library_v21');
+        listenToFirebase();
+        return;
+      } catch(e) { console.log("Firebase fallback to local"); }
+    }
+    
+    mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v21')) || initialData;
+    checkAutoAirUpdates();
+    populateGenres();
+    renderApp();
+  }
+
+  // Automatically check air dates against today (August 9, 2026) and update totals
+  function checkAutoAirUpdates() {
+    const today = new Date();
+    let updated = false;
+    mediaList.forEach(item => {
+      if (item.type === 'Show' && item.airDate) {
+        const air = new Date(item.airDate);
+        if (today >= air) {
+          const diffTime = Math.abs(today - air);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          const weeksPassed = Math.floor(diffDays / 7) + 1;
+          if (weeksPassed > item.total && item.status !== 'Completed') {
+            item.total = Math.max(item.total, weeksPassed);
+            updated = true;
+          }
+        }
+      }
+    });
+    if (updated) syncToCloud();
+  }
+
+  function listenToFirebase() {
+    dbRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        mediaList = Object.values(data);
+        checkAutoAirUpdates();
+      } else {
+        mediaList = initialData;
+        syncToCloud();
+      }
+      populateGenres();
+      renderApp();
+    });
+  }
+
+  function syncToCloud() {
+    if (dbRef) {
+      const objData = {};
+      mediaList.forEach(m => objData[m.id] = m);
+      dbRef.set(objData);
+    } else {
+      localStorage.setItem('local_media_tracker_v21', JSON.stringify(mediaList));
+      renderApp();
+    }
+  }
+
+  function switchTab(type) {
+    activeTabType = type;
+    document.querySelectorAll('.nav-tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`tab-${type}`).classList.add('active');
+
+    const overviewEl = document.getElementById('overviewDashboard');
+    const radarEl = document.getElementById('radarDashboard');
+    const tableSectionEl = document.getElementById('tableSection');
+
+    overviewEl.style.display = 'none';
+    radarEl.style.display = 'none';
+    tableSectionEl.style.display = 'none';
+
+    if (type === 'Overview') {
+      overviewEl.style.display = 'grid';
+      renderCharts();
+    } else if (type === 'Radar') {
+      radarEl.style.display = 'grid';
+      renderRadar();
+    } else {
+      tableSectionEl.style.display = 'block';
+
+      document.getElementById('col-seasons').style.display = (type === 'Show') ? 'table-cell' : 'none';
+      
+      if (type === 'Show') {
+        document.getElementById('col-total').innerText = 'Total Ep';
+        document.getElementById('col-progress').innerText = 'Watched';
+        document.getElementById('lbl-total-items').innerText = 'Total Shows';
+        document.getElementById('lbl-active-items').innerText = 'Currently Watching';
+        document.getElementById('lbl-progress-items').innerText = 'Episodes Watched';
+      } else if (type === 'Movie') {
+        document.getElementById('col-total').innerText = 'Parts';
+        document.getElementById('col-progress').innerText = 'Watched';
+        document.getElementById('lbl-total-items').innerText = 'Total Movies';
+        document.getElementById('lbl-active-items').innerText = 'To Watch';
+        document.getElementById('lbl-progress-items').innerText = 'Movies Watched';
+      } else if (type === 'Book') {
+        document.getElementById('col-total').innerText = 'Pages';
+        document.getElementById('col-progress').innerText = 'Read';
+        document.getElementById('lbl-total-items').innerText = 'Total Books';
+        document.getElementById('lbl-active-items').innerText = 'Currently Reading';
+        document.getElementById('lbl-progress-items').innerText = 'Pages Read';
+      } else if (type === 'Album') {
+        document.getElementById('col-total').innerText = 'Tracks';
+        document.getElementById('col-progress').innerText = 'Listened';
+        document.getElementById('lbl-total-items').innerText = 'Total Albums';
+        document.getElementById('lbl-active-items').innerText = 'Listening To';
+        document.getElementById('lbl-progress-items').innerText = 'Tracks Played';
+      }
+
+      populateGenres();
+      renderTable();
+    }
+  }
+
+  function renderApp() {
+    updateTopStats();
+    if (activeTabType === 'Overview') {
+      renderCharts();
+    } else if (activeTabType === 'Radar') {
+      renderRadar();
+    } else {
+      renderTable();
+    }
+  }
+
+  function updateTopStats() {
+    let totalItems = mediaList.length;
+    let totalActive = mediaList.filter(m => m.status === 'Watching' || m.status === 'Reading' || m.status === 'Up to Date').length;
+    let totalProgress = mediaList.reduce((acc, m) => acc + Number(m.progress || 0), 0);
+    let totalMax = mediaList.reduce((acc, m) => acc + Number(m.total || 0), 0);
+
+    document.getElementById('stat-total-shows').innerText = totalItems;
+    document.getElementById('stat-watching').innerText = totalActive;
+    document.getElementById('stat-episodes').innerText = totalProgress;
+    const overallPct = totalMax > 0 ? Math.round((totalProgress / totalMax) * 100) : 0;
+    document.getElementById('stat-completion').innerText = `${overallPct}%`;
+  }
+
+  function populateGenres() {
+    const activeMedia = mediaList.filter(m => m.type === activeTabType);
+    const genres = [...new Set(activeMedia.map(m => m.genre))].sort();
+    const select = document.getElementById('filterGenre');
+    select.innerHTML = '<option value="ALL">All Genres</option>';
+    genres.forEach(g => {
+      select.innerHTML += `<option value="${g}">${g}</option>`;
+    });
+  }
+
+  function renderRadar() {
+    const radarEl = document.getElementById('radarDashboard');
+    radarEl.innerHTML = '';
+    const activeOrPending = mediaList.filter(m => m.status === 'Watching' || m.status === 'Up to Date' || m.status.includes('Pending'));
+
+    if (activeOrPending.length === 0) {
+      radarEl.innerHTML = '<div style="color:var(--text-muted); grid-column: 1/-1; text-align:center; padding: 40px;">No active or pending shows right now!</div>';
+      return;
+    }
+
+    activeOrPending.forEach(item => {
+      const total = Number(item.total) || 1;
+      const progress = Number(item.progress) || 0;
+      const pct = Math.min(100, Math.round((progress / total) * 100));
+
+      radarEl.innerHTML += `
+        <div class="radar-card">
+          <img src="${item.imageUrl}" alt="Poster" class="radar-poster" referrerpolicy="no-referrer" onerror="this.src=getPlaceholderImage('${item.title}')">
+          <div class="radar-info">
+            <div class="radar-title">${item.title}</div>
+            <div style="font-size:0.75rem; color: var(--text-muted);">${item.genre} · <span style="color:var(--accent-blue);">${item.status}</span></div>
+            <div class="radar-date">📅 Air Date: ${item.airDate || 'TBD'}</div>
+            <div style="margin-top: 5px; font-size: 0.8rem; color: var(--text-muted);">Progress: ${item.progress}/${item.total} (${pct}%)</div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    const search = document.getElementById('searchInput').value.toLowerCase();
+    const fStatus = document.getElementById('filterStatus').value;
+    const fGenre = document.getElementById('filterGenre').value;
+
+    tbody.innerHTML = '';
+
+    mediaList.forEach((item) => {
+      if (item.type !== activeTabType) return;
+
+      if (search && !item.title.toLowerCase().includes(search)) return;
+      if (fStatus !== 'ALL' && !item.status.includes(fStatus)) return;
+      if (fGenre !== 'ALL' && item.genre !== fGenre) return;
+
+      const total = Number(item.total) || 1;
+      const progress = Number(item.progress) || 0;
+      const pct = Math.min(100, Math.round((progress / total) * 100));
+      const left = Math.max(0, total - progress);
+
+      let statusClass = 'status-watching';
+      if (item.status === 'Up to Date') statusClass = 'status-uptodate';
+      else if (item.status === 'Watching') statusClass = 'status-watching';
+      else if (item.status === 'Paused') statusClass = 'status-paused';
+      else if (item.status === 'Completed') statusClass = 'status-completed';
+      else if (item.status.includes('Pending')) statusClass = 'status-pending';
+
+      const showSeasonsCell = (activeTabType === 'Show') ? `<td style="text-align: center;">${item.seasons || 1}</td>` : '';
+      
+      // Conditional Button: Appears ONLY when progress < total
+      let actionBtnHtml = '';
+      if (progress < total) {
+        const label = activeTabType === 'Book' ? '+1 Pg' : activeTabType === 'Album' ? '+1 Trk' : '✨ New Episode Watched';
+        actionBtnHtml = `<button class="btn-inc" onclick="incrementProgress('${item.id}')">${label}</button>`;
+      }
+
+      let starsHtml = '';
+      let currentRating = item.rating || 0;
+      for (let s = 1; s <= 5; s++) {
+        starsHtml += `<span class="star ${s <= currentRating ? 'active' : ''}" onclick="setRating('${item.id}', ${s})">★</span>`;
+      }
+
+      const vibes = [
+        "🔥 Absolute Fire", 
+        "🤯 Mind Blown", 
+        "😭 Emotional Damage", 
+        "✨ Cozy", 
+        "🤡 Pure Comedy",
+        "🗑️ Absolute Trash", 
+        "🥱 Total Snoozefest", 
+        "🤡 Clown Show", 
+        "💀 Cringe Overload", 
+        "🫠 Painful to Watch"
+      ];
+      let vibeOptions = `<option value="">Select Vibe...</option>`;
+      vibes.forEach(v => {
+        vibeOptions += `<option value="${v}" ${item.vibe === v ? 'selected' : ''}>${v}</option>`;
+      });
+
+      // SVG Heart Fill Height Calculation
+      const fillHeight = (24 * pct) / 100;
+      const clipY = 24 - fillHeight;
+
+      tbody.innerHTML += `
+        <tr>
+          <td>
+            <div class="ratings-box">
+              <div class="stars-row">${starsHtml}</div>
+              <select class="vibe-select" onchange="setVibe('${item.id}', this.value)">${vibeOptions}</select>
+            </div>
+          </td>
+          <td>
+            <div class="title-cell">
+              <img src="${item.imageUrl}" alt="Poster" class="poster-img" referrerpolicy="no-referrer" onerror="this.src=getPlaceholderImage('${item.title}')">
+              <div class="title-text">
+                <span>${item.title}</span>
+                <span class="icon-badge">${item.icon || '📌'}</span>
+              </div>
+            </div>
+          </td>
+          <td style="color: var(--text-muted);">${item.genre}</td>
+          ${showSeasonsCell}
+          <td><span class="tag-status ${statusClass}">${item.status}</span></td>
+          <td style="text-align: center;">${item.total}</td>
+          <td style="text-align: center; font-weight: bold; color: #fff;">${item.progress}</td>
+          <td>
+            <div class="completion-shape-box">
+              <svg width="26" height="26" viewBox="0 0 24 24">
+                <defs>
+                  <clipPath id="clip-${item.id}">
+                    <rect x="0" y="${clipY}" width="24" height="${fillHeight}" />
+                  </clipPath>
+                </defs>
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#2b1b4e" stroke="#382f66" stroke-width="1.5"/>
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#facc15" clip-path="url(#clip-${item.id})"/>
+              </svg>
+              <span style="font-size: 0.8rem; font-weight: 700; color: var(--text);">${pct}%</span>
+            </div>
+          </td>
+          <td style="text-align: center; color: ${left > 0 ? '#f97316' : 'var(--text-muted)'};">${left}</td>
+          <td style="font-size: 0.85rem; color: var(--text-muted); max-width: 150px; word-break: break-word;">${item.notes || '-'}</td>
+          <td style="text-align: center; white-space: nowrap;">
+            ${actionBtnHtml}
+            <button class="btn-edit" onclick="openEditModal('${item.id}')">✏️ Edit</button>
+            <button class="btn-delete" onclick="deleteItem('${item.id}')">×</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  function renderCharts() {
+    const visualMedia = mediaList.filter(m => m.type === 'Show' || m.type === 'Movie');
+
+    const genreCounts = {};
+    visualMedia.forEach(m => {
+      const g = m.genre || 'General';
+      genreCounts[g] = (genreCounts[g] || 0) + 1;
+    });
+
+    const ratingCounts = { 'Unrated': 0, '1 Star': 0, '2 Stars': 0, '3 Stars': 0, '4 Stars': 0, '5 Stars': 0 };
+    visualMedia.forEach(m => {
+      const r = Number(m.rating) || 0;
+      if (r === 0) ratingCounts['Unrated']++;
+      else if (r === 1) ratingCounts['1 Star']++;
+      else if (r === 2) ratingCounts['2 Stars']++;
+      else if (r === 3) ratingCounts['3 Stars']++;
+      else if (r === 4) ratingCounts['4 Stars']++;
+      else if (r === 5) ratingCounts['5 Stars']++;
+    });
+
+    const statusCounts = { 'Up to Date': 0, Watching: 0, Paused: 0, Completed: 0, 'Pending Next Season': 0, 'Pending Movie': 0 };
+    visualMedia.forEach(m => {
+      if (statusCounts[m.status] !== undefined) statusCounts[m.status]++;
+      else statusCounts['Watching']++;
+    });
+
+    const vibeCounts = { 'Unassigned': 0 };
+    visualMedia.forEach(m => {
+      const v = m.vibe ? m.vibe : 'Unassigned';
+      vibeCounts[v] = (vibeCounts[v] || 0) + 1;
+    });
+
+    const commonOptions = (callback) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      onClick: (e, activeElements, chart) => {
+        if (activeElements.length > 0) {
+          const idx = activeElements[0].index;
+          const label = chart.data.labels[idx];
+          callback(label);
+        }
+      }
+    });
+
+    const percentagePlugin = {
+      id: 'percentagePlugin',
+      afterDatasetsDraw(chart) {
+        const { ctx } = chart;
+        const meta = chart.getDatasetMeta(0);
+        const total = meta.total;
+        
+        meta.data.forEach((element, index) => {
+          const value = chart.data.datasets[0].data[index];
+          if (value === 0) return;
+          const percentage = ((value / total) * 100).toFixed(0) + '%';
+          const { x, y } = element.tooltipPosition();
+
+          ctx.fillStyle = '#fff';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(percentage, x, y);
+        });
+      }
+    };
+
+    // Genre Chart
+    const ctxGenre = document.getElementById('genreChart').getContext('2d');
+    if (genreChartInstance) genreChartInstance.destroy();
+    genreChartInstance = new Chart(ctxGenre, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(genreCounts),
+        datasets: [{
+          data: Object.values(genreCounts),
+          backgroundColor: ['#3b82f6', '#8b5cf6', '#facc15', '#10b981', '#f43f5e', '#06b6d4', '#ec4899', '#f97316'],
+          borderWidth: 0
+        }]
+      },
+      options: commonOptions((label) => {
+        const matches = visualMedia.filter(m => (m.genre || 'General') === label);
+        showCardDrilldown('genre', `Genre: ${label}`, matches);
+      }),
+      plugins: [percentagePlugin]
+    });
+
+    // Rating Chart
+    const ctxRating = document.getElementById('ratingChart').getContext('2d');
+    if (ratingChartInstance) ratingChartInstance.destroy();
+    ratingChartInstance = new Chart(ctxRating, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(ratingCounts),
+        datasets: [{
+          data: Object.values(ratingCounts),
+          backgroundColor: '#facc15',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        ...commonOptions((label) => {
+          const starNum = label === 'Unrated' ? 0 : parseInt(label);
+          const matches = visualMedia.filter(m => (Number(m.rating) || 0) === starNum);
+          showCardDrilldown('rating', `Rating: ${label}`, matches);
+        }),
+        scales: {
+          x: { ticks: { color: '#a5b4fc', font: { size: 10 } }, grid: { display: false } },
+          y: { ticks: { color: '#a5b4fc', stepSize: 1 }, grid: { color: '#382f66' } }
+        }
+      }
+    });
+
+    // Status Chart
+    const ctxStatus = document.getElementById('statusChart').getContext('2d');
+    if (statusChartInstance) statusChartInstance.destroy();
+    statusChartInstance = new Chart(ctxStatus, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(statusCounts),
+        datasets: [{
+          data: Object.values(statusCounts),
+          backgroundColor: ['#10b981', '#3b82f6', '#ef4444', '#8b5cf6', '#b45309', '#92400e'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        ...commonOptions((label) => {
+          const matches = visualMedia.filter(m => m.status === label);
+          showCardDrilldown('status', `Status: ${label}`, matches);
+        }),
+        scales: {
+          x: { ticks: { color: '#a5b4fc', font: { size: 8 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+          y: { ticks: { color: '#a5b4fc', stepSize: 1 }, grid: { color: '#382f66' } }
+        }
+      }
+    });
+
+    // Vibe Chart
+    const ctxVibe = document.getElementById('vibeChart').getContext('2d');
+    if (vibeChartInstance) vibeChartInstance.destroy();
+    vibeChartInstance = new Chart(ctxVibe, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(vibeCounts),
+        datasets: [{
+          data: Object.values(vibeCounts),
+          backgroundColor: '#8b5cf6',
+          borderRadius: 6
+        }]
+      },
+      options: {
+        ...commonOptions((label) => {
+          const matches = visualMedia.filter(m => (m.vibe || 'Unassigned') === label);
+          showCardDrilldown('vibe', `Vibe: ${label}`, matches);
+        }),
+        scales: {
+          x: { ticks: { color: '#a5b4fc', font: { size: 9 }, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+          y: { ticks: { color: '#a5b4fc', stepSize: 1 }, grid: { color: '#382f66' } }
+        }
+      }
+    });
+  }
+
+  function showCardDrilldown(chartType, title, items) {
+    const container = document.getElementById(`drilldown-${chartType}`);
+    container.style.display = 'block';
+    container.innerHTML = `<h4>🔍 ${title} (${items.length}):</h4><div class="drilldown-tags"></div>`;
+    const listEl = container.querySelector('.drilldown-tags');
+
+    if (items.length === 0) {
+      listEl.innerHTML = '<span style="color:var(--text-muted); font-size:0.8rem;">None found.</span>';
+      return;
+    }
+
+    items.forEach(item => {
+      listEl.innerHTML += `<div class="drilldown-tag">${item.icon || '🎬'} ${item.title}</div>`;
+    });
+  }
+
+  // --- ACTIONS ---
+  function setRating(id, rating) {
+    const item = mediaList.find(m => m.id === id);
+    if (item) {
+      item.rating = (item.rating === rating) ? 0 : rating; 
+      syncToCloud();
+    }
+  }
+
+  function setVibe(id, vibe) {
+    const item = mediaList.find(m => m.id === id);
+    if (item) {
+      item.vibe = vibe;
+      syncToCloud();
+    }
+  }
+
+  function incrementProgress(id) {
+    const item = mediaList.find(m => m.id === id);
+    if (item && item.progress < item.total) {
+      item.progress = Number(item.progress) + 1;
+      if (item.progress === item.total) {
+        if (item.type === 'Book') item.status = 'Read';
+        else if (item.type === 'Show' || item.type === 'Movie') item.status = 'Completed';
+      }
+      syncToCloud();
+    }
+  }
+
+  function autoFillPlaceholderImage() {
+    const titleVal = document.getElementById('modalTitleInput').value.trim();
+    const imgInput = document.getElementById('modalImgInput');
+    if (!imgInput.value || imgInput.value.includes('placehold.co')) {
+      imgInput.value = getPlaceholderImage(titleVal);
+    }
+  }
+
+  function openAddModal() {
+    document.getElementById('modalTitle').innerText = "Add New Item";
+    document.getElementById('editId').value = "";
+    document.getElementById('modalTitleInput').value = "";
+    document.getElementById('modalTypeInput').value = activeTabType === 'Overview' || activeTabType === 'Radar' ? 'Show' : activeTabType;
+    document.getElementById('modalGenreInput').value = "";
+    document.getElementById('modalStatusInput').value = "Watching";
+    document.getElementById('modalSeasonsInput').value = "1";
+    document.getElementById('modalTotalInput').value = "12";
+    document.getElementById('modalProgressInput').value = "0";
+    document.getElementById('modalAirDateInput').value = "";
+    document.getElementById('modalNotesInput').value = "";
+    document.getElementById('modalImgInput').value = getPlaceholderImage("New Item");
+    document.getElementById('itemModal').style.display = 'flex';
+  }
+
+  function openEditModal(id) {
+    const item = mediaList.find(m => m.id === id);
+    if (!item) return;
+
+    document.getElementById('modalTitle').innerText = "Edit Item";
+    document.getElementById('editId').value = item.id;
+    document.getElementById('modalTitleInput').value = item.title;
+    document.getElementById('modalTypeInput').value = item.type;
+    document.getElementById('modalGenreInput').value = item.genre;
+    document.getElementById('modalStatusInput').value = item.status;
+    document.getElementById('modalSeasonsInput').value = item.seasons || 1;
+    document.getElementById('modalTotalInput').value = item.total;
+    document.getElementById('modalProgressInput').value = item.progress;
+    document.getElementById('modalAirDateInput').value = item.airDate || "";
+    document.getElementById('modalNotesInput').value = item.notes || "";
+    document.getElementById('modalImgInput').value = item.imageUrl || getPlaceholderImage(item.title);
+    document.getElementById('itemModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('itemModal').style.display = 'none';
+  }
+
+  function saveModalData() {
+    const id = document.getElementById('editId').value;
+    const title = document.getElementById('modalTitleInput').value.trim();
+    if (!title) { alert("Title is required!"); return; }
+
+    const type = document.getElementById('modalTypeInput').value;
+    const genre = document.getElementById('modalGenreInput').value.trim();
+    const status = document.getElementById('modalStatusInput').value;
+    const seasons = Number(document.getElementById('modalSeasonsInput').value) || 1;
+    const total = Number(document.getElementById('modalTotalInput').value) || 1;
+    const progress = Number(document.getElementById('modalProgressInput').value) || 0;
+    const airDate = document.getElementById('modalAirDateInput').value;
+    const notes = document.getElementById('modalNotesInput').value.trim();
+    let imgUrl = document.getElementById('modalImgInput').value.trim();
+    if (!imgUrl) imgUrl = getPlaceholderImage(title);
+
+    if (id) {
+      const item = mediaList.find(m => m.id === id);
+      if (item) {
+        item.title = title;
+        item.type = type;
+        item.genre = genre || "General";
+        item.status = status;
+        item.seasons = seasons;
+        item.total = total;
+        item.progress = progress;
+        item.airDate = airDate;
+        item.notes = notes;
+        item.imageUrl = imgUrl;
+      }
+    } else {
+      const newObj = {
+        id: Date.now().toString(),
+        type: type,
+        imageUrl: imgUrl,
+        icon: type === 'Show' ? '📺' : type === 'Movie' ? '🎬' : type === 'Book' ? '📚' : '🎵',
+        title: title,
+        rating: 0,
+        vibe: "",
+        genre: genre || "General",
+        seasons: seasons,
+        status: status,
+        total: total,
+        progress: progress,
+        airDate: airDate,
+        notes: notes
+      };
+      mediaList.push(newObj);
+    }
+
+    closeModal();
+    populateGenres();
+    syncToCloud();
+  }
+
+  function deleteItem(id) {
+    if (confirm("Remove this item from the library?")) {
+      mediaList = mediaList.filter(m => m.id !== id);
+      syncToCloud();
+    }
+  }
+
+  // --- ROULETTE LOGIC ---
+  function spinRoulette() {
+    const targetType = (activeTabType === 'Overview' || activeTabType === 'Radar') ? 'Show' : activeTabType;
+    const eligibleItems = mediaList.filter(m => m.type === targetType && m.status !== 'Completed' && m.status !== 'Read');
+    
+    if (eligibleItems.length === 0) {
+      alert("No active items found in this category to spin for! Add some or change their status.");
+      return;
+    }
+
+    const modal = document.getElementById('rouletteModal');
+    const display = document.getElementById('rouletteDisplay');
+    modal.style.display = 'flex';
+
+    let counter = 0;
+    let spins = 20;
+    let speed = 50;
+
+    function roll() {
+      const randomItem = eligibleItems[Math.floor(Math.random() * eligibleItems.length)];
+      display.innerText = `${randomItem.icon || '🎬'} ${randomItem.title}`;
+      counter++;
+
+      if (counter < spins) {
+        setTimeout(roll, speed);
+        speed += 10; 
+      } else {
+        display.innerHTML = `🎉 Winner: <br><strong style="color: #facc15; font-size: 1.4rem;">${display.innerText}</strong>`;
+      }
+    }
+
+    roll();
+  }
+
+  function closeRoulette() {
+    document.getElementById('rouletteModal').style.display = 'none';
+  }
+
+  function configureFirebase() {
+    const dbUrl = prompt("Paste your Firebase Realtime Database URL:\n(e.g., https://your-app-default-rtdb.firebaseio.com)");
+    if (!dbUrl) return;
+    const config = { databaseURL: dbUrl };
+    localStorage.setItem('fb_tracker_config', JSON.stringify(config));
+    location.reload();
+  }
+
+  initApp();
+</script>
+
+</body>
+</html>
