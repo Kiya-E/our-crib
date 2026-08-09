@@ -54,8 +54,6 @@
       100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(96, 165, 250, 0); }
     }
 
-    .setup-banner { background: #1e1b4b; border: 2px dashed #6d28d9; color: #ede9fe; padding: 14px 18px; border-radius: 12px; margin-bottom: 25px; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
-
     /* Summary Bar */
     .summary-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
     .sum-card { background: var(--card-bg); border: 2px solid var(--border); padding: 18px; border-radius: 14px; box-shadow: 0 4px 10px rgba(0,0,0,0.2); transition: transform 0.2s; }
@@ -182,11 +180,6 @@
       <div class="sync-dot"></div> Live Duo Sync
     </div>
   </header>
-
-  <div class="setup-banner" id="setupBanner">
-    <span>💡 <strong>Realtime Sharing Active:</strong> Open this link on both your devices to track together live!</span>
-    <button class="btn-inc" style="background:#3b82f6; color:#fff; border-color:#60a5fa; font-size: 0.85rem;" onclick="configureFirebase()">Configure Firebase Key</button>
-  </div>
 
   <div class="summary-bar">
     <div class="sum-card"><div class="label" id="lbl-total-items">Total Shows</div><div class="val" id="stat-total-shows">0</div></div>
@@ -404,15 +397,14 @@
   let dbRef = null;
 
   function initApp() {
-    const savedConfig = localStorage.getItem('fb_tracker_config');
-    if (savedConfig) {
-      try {
-        firebase.initializeApp(JSON.parse(savedConfig));
-        dbRef = firebase.database().ref('media_library_v21');
-        listenToFirebase();
-        return;
-      } catch(e) { console.log("Firebase fallback to local"); }
-    }
+    const databaseURL = "https://ourcrib-f0227-default-rtdb.europe-west1.firebasedatabase.app/";
+    
+    try {
+      firebase.initializeApp({ databaseURL: databaseURL });
+      dbRef = firebase.database().ref('media_library_v21');
+      listenToFirebase();
+      return;
+    } catch(e) { console.log("Firebase init error", e); }
     
     mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v21')) || initialData;
     checkAutoAirUpdates();
@@ -1050,14 +1042,6 @@
 
   function closeRoulette() {
     document.getElementById('rouletteModal').style.display = 'none';
-  }
-
-  function configureFirebase() {
-    const dbUrl = prompt("Paste your Firebase Realtime Database URL:\n(e.g., https://your-app-default-rtdb.firebaseio.com)");
-    if (!dbUrl) return;
-    const config = { databaseURL: dbUrl };
-    localStorage.setItem('fb_tracker_config', JSON.stringify(config));
-    location.reload();
   }
 
   initApp();
