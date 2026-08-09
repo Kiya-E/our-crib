@@ -401,12 +401,12 @@
     
     try {
       firebase.initializeApp({ databaseURL: databaseURL });
-      dbRef = firebase.database().ref('media_library_v21');
+      dbRef = firebase.database().ref('media_library_v22');
       listenToFirebase();
       return;
     } catch(e) { console.log("Firebase init error", e); }
     
-    mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v21')) || initialData;
+    mediaList = JSON.parse(localStorage.getItem('local_media_tracker_v22')) || initialData;
     checkAutoAirUpdates();
     populateGenres();
     renderApp();
@@ -454,7 +454,7 @@
       mediaList.forEach(m => objData[m.id] = m);
       dbRef.set(objData);
     } else {
-      localStorage.setItem('local_media_tracker_v21', JSON.stringify(mediaList));
+      localStorage.setItem('local_media_tracker_v22', JSON.stringify(mediaList));
       renderApp();
     }
   }
